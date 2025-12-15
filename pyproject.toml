@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trinetra"
+version = "1.0.0"
+authors = [
+  { name="Samir Khanal", email="samir.khanal458@gmail.com" },
+]
+description = "A CLI tool to record screen activity, upload to S3, and generate summaries."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "click>=8.0",
+    "boto3>=1.26",
+    "mss>=7.0",
+    "Pillow>=9.0",
+    "pytesseract>=0.3",
+    "pandas>=1.5",
+    "pyarrow>=10.0",
+    "python-dotenv>=0.21",
+    "transformers>=4.25",
+    "torch>=1.13",
+    "torchvision>=0.14",
+    "psutil>=5.9"
+]
+
+[project.scripts]
+trinetra = "cli:cli"
+
+# This tells setuptools to look for packages inside the 'src' directory.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.urls]
+"Homepage" = "https://github.com/samirkhanal52/trinetra-cli"
+"Bug Tracker" = "https://github.com/samirkhanal52/trinetra-cli/issues"
