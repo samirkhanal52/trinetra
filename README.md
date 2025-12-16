@@ -73,8 +73,8 @@ The tool is configured using a `.env` file.
 1.  Copy `.env.example` to `.env`.
 2.  Edit the `.env` file. You can choose between using AWS S3 for production or a local MinIO instance for development.
 
--   **To use local MinIO**: Set `USE_MINIO="True"` and fill in the `MINIO_*` variables.
--   **To use AWS S3**: Set `USE_MINIO="False"` and fill in the `AWS_*` variables.
+-   **To use local MinIO**: Set `TRINETRA_ENV="local"` and fill in the `MINIO_*` variables.
+-   **To use AWS S3**: Set `TRINETRA_ENV="prod"` and fill in the `AWS_*` variables.
 
 ## Local Development with MinIO
 

@@ -7,13 +7,13 @@ load_dotenv()
 # --- Service Configuration ---
 RECORDER_PID_FILE = "screenrec_recorder.pid"
 UPLOADER_PID_FILE = "screenrec_uploader.pid"
-AGENT_PID_FILE = "trinetra_agent.pid"
+INDEXING_PID_FILE = "trinetra_indexing.pid"
 STOP_FILE = ".STOP_RECORDING" # Can be used as a global kill switch
 DATA_DIR = "data"
 OUTBOX_DIR = os.path.join(DATA_DIR, "outbox") # Shared directory for services
 
 # --- S3/MinIO Configuration ---
-USE_MINIO = os.getenv("USE_MINIO", "False").lower() in ('true', '1', 't')
+TRINETRA_ENV = os.getenv("TRINETRA_ENV", "local").lower()
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 S3_PREFIX = os.getenv("S3_PREFIX", "screen-recordings")
 
@@ -25,12 +25,15 @@ MINIO_ENDPOINT_URL = os.getenv("MINIO_ENDPOINT_URL")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 
-# Tesseract Configuration
-TESSERACT_CMD = os.getenv("TESSERACT_CMD")
+# --- Vector Database Path ---
+CHROMA_DB_PATH = "chroma_db"
+
+# --- Generative AI Keys ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def validate_config():
     """Validates that essential configuration is set."""
-    if USE_MINIO:
+    if TRINETRA_ENV == "local":
         required_vars = ["MINIO_ENDPOINT_URL", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY", "S3_BUCKET_NAME"]
         logging.info("Using MinIO configuration.")
     else:
@@ -42,4 +45,8 @@ def validate_config():
     if missing_vars:
         logging.error(f"Missing required environment variables: {', '.join(missing_vars)}")
         return False
+    
+    if not OPENAI_API_KEY:
+        logging.warning("OPENAI_API_KEY is not set. AI processing features will fail.")
+
     return True

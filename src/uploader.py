@@ -20,7 +20,7 @@ class UploaderService:
 
     def _create_s3_client(self):
         """Creates a boto3 S3 client for either AWS or MinIO."""
-        if config.USE_MINIO:
+        if config.TRINETRA_ENV == "local":
             logging.info(f"Connecting to MinIO at {config.MINIO_ENDPOINT_URL}")
             return boto3.client(
                 's3',
@@ -128,7 +128,7 @@ class UploaderService:
                 logging.info(f"Bucket '{config.S3_BUCKET_NAME}' not found. Creating it...")
                 try:
                     # For AWS, specifying a region other than us-east-1 requires LocationConstraint
-                    if config.AWS_REGION and config.AWS_REGION != 'us-east-1' and not config.USE_MINIO:
+                    if config.AWS_REGION and config.AWS_REGION != 'us-east-1' and config.TRINETRA_ENV == "prod":
                         self.s3_client.create_bucket(Bucket=config.S3_BUCKET_NAME, CreateBucketConfiguration={'LocationConstraint': config.AWS_REGION})
                     else:
                         self.s3_client.create_bucket(Bucket=config.S3_BUCKET_NAME)
