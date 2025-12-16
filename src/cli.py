@@ -8,7 +8,7 @@ import subprocess
 import utils, config
 from recorder import RecorderService
 from uploader import UploaderService
-from agent_service import AgentService
+from indexing_service import AgentService
 
 # --- Helper Functions for Service Management ---
 def _start_service(service_name: str, pid_file: str):
