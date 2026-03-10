@@ -1,15 +1,18 @@
-import mss
-import mss.tools
-import time
-import os
-import uuid
 import json
 import logging
-from datetime import datetime
+import os
 import signal
+import time
+import uuid
+from datetime import datetime
 
-import utils, config
-from uploader import UploaderService
+import mss
+import mss.tools
+
+import src.config as config
+import src.utils as utils
+from src.uploader import UploaderService
+
 
 class RecorderService:
     """Captures the screen and saves screenshots and metadata locally."""
@@ -27,7 +30,7 @@ class RecorderService:
     def run_forever(self):
         """The main blocking loop that captures and saves screenshots."""
         utils.safe_create_dir(config.OUTBOX_DIR)
-        
+
         # Write PID to file for the 'stop' command to find
         with open(config.RECORDER_PID_FILE, "w") as f:
             f.write(str(os.getpid()))
@@ -37,25 +40,35 @@ class RecorderService:
             while not self._shutdown:
                 try:
                     start_time = time.time()
-                    
+
                     image_uuid = str(uuid.uuid4())
                     timestamp = datetime.utcnow()
-                    base_filename = f"{timestamp.strftime('%Y%m%dT%H%M%S')}_{image_uuid}"
-                    
+                    base_filename = (
+                        f"{timestamp.strftime('%Y%m%dT%H%M%S')}_{image_uuid}"
+                    )
+
                     monitor = sct.monitors[1]
                     sct_img = sct.grab(monitor)
-                    
-                    local_image_path = os.path.join(config.OUTBOX_DIR, f"{base_filename}.png")
+
+                    local_image_path = os.path.join(
+                        config.OUTBOX_DIR, f"{base_filename}.png"
+                    )
                     mss.tools.to_png(sct_img.rgb, sct_img.size, output=local_image_path)
 
-                    metadata = utils.create_metadata((monitor["width"], monitor["height"]))
-                    local_metadata_path = os.path.join(config.OUTBOX_DIR, f"{base_filename}.json")
-                    with open(local_metadata_path, 'w') as f:
+                    metadata = utils.create_metadata(
+                        (monitor["width"], monitor["height"])
+                    )
+                    local_metadata_path = os.path.join(
+                        config.OUTBOX_DIR, f"{base_filename}.json"
+                    )
+                    with open(local_metadata_path, "w") as f:
                         json.dump(metadata, f)
 
                     uploader_service = UploaderService()
-                    uploader_service._process_and_upload(local_image_path, local_metadata_path)
-                    
+                    uploader_service._process_and_upload(
+                        local_image_path, local_metadata_path
+                    )
+
                     logging.info(f"Captured screenshot: {base_filename}.png")
 
                     elapsed = time.time() - start_time

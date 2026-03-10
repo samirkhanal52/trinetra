@@ -22,7 +22,6 @@ dependencies = [
     "mss>=7.0",
     "Pillow>=9.0",
     "pytesseract>=0.3",
-    "pandas>=1.5",
     "pyarrow>=10.0",
     "python-dotenv>=0.21",
     "transformers>=4.25",
@@ -38,12 +37,16 @@ dependencies = [
 ]
 
 [project.scripts]
-trinetra = "cli:cli"
+trinetra = "src.cli:cli"
 
 # This tells setuptools to look for packages inside the 'src' directory.
+[tool.setuptools]
+py-modules = ["src"]
+
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["src*"]
 
 [project.urls]
-"Homepage" = "https://github.com/samirkhanal52/trinetra-cli"
-"Bug Tracker" = "https://github.com/samirkhanal52/trinetra-cli/issues"
+"Homepage" = "https://github.com/samirkhanal52/trinetra"
+"Bug Tracker" = "https://github.com/samirkhanal52/trinetra/issues"

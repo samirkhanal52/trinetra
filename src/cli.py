@@ -1,38 +1,45 @@
-import click
-import os
-import sys
 import logging
-import psutil
+import os
 import subprocess
+import sys
 
-import utils, config
-from recorder import RecorderService
-from uploader import UploaderService
-from indexing_service import AgentService
+import click
+import psutil
+
+import src.config as config
+import src.utils as utils
+from src.indexing_service import IndexingService
+from src.rag_query import query_trinetra
+from src.recorder import RecorderService
+from src.uploader import UploaderService
+
 
 # --- Helper Functions for Service Management ---
 def _start_service(service_name: str, pid_file: str):
-    """Launches a service as a detached background process."""
+    """Launches a service in the foreground."""
     pid = utils.get_pid_from_file(pid_file)
     if pid and psutil.pid_exists(pid):
-        logging.warning(f"{service_name.capitalize()} service (PID: {pid}) is already running.")
+        logging.warning(
+            f"{service_name.capitalize()} service (PID: {pid}) is already running."
+        )
         return
 
-    command = [sys.executable, "-m", "cli", f"_run-{service_name}"]
-
-    # Platform-specific flags to run the process in the background detached from the console.
-    creationflags = 0
-    preexec_fn = None
-    if sys.platform == "win32":
-        creationflags = subprocess.DETACHED_PROCESS
-    else: # POSIX
-        preexec_fn = os.setsid
-
-    click.echo(f"Starting {service_name} service... It will run as a detached background process.")
+    click.echo(f"Starting {service_name} service in foreground...")
     
-    # We don't store the Popen object, it's fire-and-forget.
-    # The new process is responsible for its own lifecycle.
-    subprocess.Popen(command, creationflags=creationflags, preexec_fn=preexec_fn, close_fds=True)
+    # Run the service directly instead of spawning a detached process
+    if service_name == "recorder":
+        service = RecorderService()
+        service.run_forever()
+    elif service_name == "uploader":
+        service = UploaderService()
+        service._upload_loop()
+    elif service_name == "indexing":
+        service = IndexingService()
+        service.run_forever()
+    else:
+        click.echo(f"Unknown service: {service_name}")
+        sys.exit(1)
+
 
 def _stop_service(pid_file: str):
     # ... (this function remains the same, it correctly kills by PID) ...
@@ -45,14 +52,14 @@ def _stop_service(pid_file: str):
 
     try:
         p = psutil.Process(pid)
-        p.terminate() # Sends SIGTERM
+        p.terminate()  # Sends SIGTERM
         p.wait(timeout=5)
         logging.info(f"Successfully stopped process (PID: {pid}).")
     except psutil.NoSuchProcess:
         logging.error(f"No process with PID {pid} found.")
     except psutil.TimeoutExpired:
         logging.warning(f"Process {pid} did not terminate gracefully. Killing.")
-        p.kill() # Sends SIGKILL
+        p.kill()  # Sends SIGKILL
     except Exception as e:
         logging.error(f"Failed to stop process {pid}: {e}")
     finally:
@@ -75,19 +82,23 @@ def recorder():
     """Commands to control the screen recorder service."""
     pass
 
+
 @recorder.command("start")
 def recorder_start():
     """Starts the screen recorder as a background process."""
     utils.setup_logging()
     if not config.validate_config():
         raise click.Abort()
-    
+
     # I've updated the prompt to be more clear.
-    consent = click.prompt("This will record your screen and save images locally. The uploader service will move them to the cloud. Type [Y] to continue.")
+    consent = click.prompt(
+        "This will record your screen and save images locally. The uploader service will move them to the cloud. Type [Y] to continue."
+    )
     if consent != "Y":
         click.echo("Consent not given. Aborting.")
         return
     _start_service("recorder", config.RECORDER_PID_FILE)
+
 
 @recorder.command("stop")
 def recorder_stop():
@@ -96,45 +107,71 @@ def recorder_stop():
     _stop_service(config.RECORDER_PID_FILE)
 
 
-# @cli.group()
-# def uploader():
-#     """Commands to control the S3/MinIO uploader service."""
-#     pass
-
-# @uploader.command("start")
-# def uploader_start():
-#     """Starts the uploader service as a background process."""
-#     utils.setup_logging()
-#     if not config.validate_config():
-#         raise click.Abort()
-#     _start_service("uploader", config.UPLOADER_PID_FILE)
-
-# @uploader.command("stop")
-# def uploader_stop():
-#     """Stops the uploader service."""
-#     utils.setup_logging()
-#     _stop_service(config.UPLOADER_PID_FILE)
-
-# --- Agent Service Group ---
 @cli.group()
-def agent():
-    """Commands to control the analysis agent service."""
+def uploader():
+    """Commands to control the S3/MinIO uploader service."""
     pass
 
-@agent.command("start")
-def agent_start():
-    """Starts the agent service as a background process."""
+
+@uploader.command("start")
+def uploader_start():
+    """Starts the uploader service as a background process."""
     utils.setup_logging()
     if not config.validate_config():
         raise click.Abort()
-    click.echo("This service should be run inside the Docker container.")
-    _start_service("agent", config.AGENT_PID_FILE)
+    _start_service("uploader", config.UPLOADER_PID_FILE)
 
-@agent.command("stop")
-def agent_stop():
-    """Stops the agent service."""
+
+@uploader.command("stop")
+def uploader_stop():
+    """Stops the uploader service."""
     utils.setup_logging()
-    _stop_service(config.AGENT_PID_FILE)
+    _stop_service(config.UPLOADER_PID_FILE)
+
+
+# --- Agent Service Group ---
+@cli.group()
+def indexing():
+    """Commands to control the GenAI indexing service."""
+    pass
+
+
+@indexing.command("start")
+def indexing_start():
+    """Starts the indexing service as a background process."""
+    utils.setup_logging()
+    config.validate_config()
+    click.echo("This service should be run inside the Docker container.")
+    _start_service("indexing", config.INDEXING_PID_FILE)
+
+
+@indexing.command("stop")
+def indexing_stop():
+    """Stops the indexing service."""
+    utils.setup_logging()
+    _stop_service(config.INDEXING_PID_FILE)
+
+
+@cli.command()
+@click.argument("question", type=str)
+def query(question: str):
+    """Ask a question about your past activity using the RAG pipeline."""
+    utils.setup_logging()
+    config.validate_config()
+    click.echo("Querying your indexed history... (this may take a moment)")
+
+    response = query_trinetra(question)
+
+    click.echo("\n--- Answer ---")
+    click.echo(response)
+
+
+@cli.command("_run-indexing", hidden=True)
+def _run_indexing():
+    utils.setup_logging()
+    config.validate_config()
+    service = IndexingService()
+    service.run_forever()
 
 
 # --- Hidden Commands (Actual Service Runners) ---
@@ -147,24 +184,16 @@ def _run_recorder():
     service = RecorderService()
     service.run_forever()
 
-# @cli.command("_run-uploader", hidden=True)
-# def _run_uploader():
-#     """(Internal) Runs the uploader service's main loop."""
-#     utils.setup_logging()
-#     if not config.validate_config():
-#         sys.exit(1)
-#     service = UploaderService()
-#     service.run_forever()
 
-@cli.command("_run-agent", hidden=True)
-def _run_agent():
-    """(Internal) Runs the agent service's main loop."""
+@cli.command("_run-uploader", hidden=True)
+def _run_uploader():
+    """(Internal) Runs the uploader service's main loop."""
     utils.setup_logging()
     if not config.validate_config():
         sys.exit(1)
-    service = AgentService()
-    service.run_forever()
+    service = UploaderService()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # This makes 'python -m trinetra.cli ...' work
     cli()

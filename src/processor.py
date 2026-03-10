@@ -1,12 +1,13 @@
 import base64
 import json
 import logging
-from PIL import Image
-import pytesseract
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage
 
-from . import config
+import pytesseract
+from langchain_core.messages import HumanMessage
+from langchain_community.chat_models import ChatOllama
+from PIL import Image
+
+# from src.config import TESSERACT_CMD
 
 # --- PDO Prompt Template ---
 PDO_PROMPT = """
@@ -21,15 +22,20 @@ PDO_PROMPT = """
 - `keywords`: array of strings (List of 3-5 important keywords or entities from the screen, like filenames, function names, or website titles.)
 """
 
+
 class ImageProcessor:
     """
     Processes screenshots using a multi-modal LLM to generate structured "Action Logs".
     """
+
     def __init__(self):
-        # Using a powerful multi-modal model is key.
-        self.llm = ChatOpenAI(model="gpt-4o", max_tokens=512)
-        if config.TESSERACT_CMD:
-            pytesseract.pytesseract.tesseract_cmd = config.TESSERACT_CMD
+        # Using Ollama with llama3.2-vision for free local processing
+        self.llm = ChatOllama(
+            model="llama3.2-vision",
+            base_url="http://host.docker.internal:11434"
+        )
+        # if TESSERACT_CMD:
+        #     pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
     def _get_text_from_image(self, image_path: str) -> str:
         try:
@@ -41,7 +47,7 @@ class ImageProcessor:
     @staticmethod
     def _encode_image(image_path: str) -> str:
         with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+            return base64.b64encode(image_file.read()).decode("utf-8")
 
     def process(self, image_path: str) -> dict | None:
         """
@@ -58,10 +64,13 @@ class ImageProcessor:
                     "type": "image_url",
                     "image_url": {"url": f"data:image/png;base64,{base64_image}"},
                 },
-                {"type": "text", "text": f"Here is the supplementary OCR text to aid your analysis:\n\n---\n{ocr_text[:2000]}\n---"},
+                {
+                    "type": "text",
+                    "text": f"Here is the supplementary OCR text to aid your analysis:\n\n---\n{ocr_text[:2000]}\n---",
+                },
             ]
         )
-        
+
         try:
             response = self.llm.invoke([message])
             action_log = json.loads(response.content)
