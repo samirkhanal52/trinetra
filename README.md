@@ -49,15 +49,15 @@ This decoupled design ensures that screen recording can continue even if the net
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/samirkhanal52/trinetra-cli.git
+    git clone https://github.com/samirkhanal52/trinetra.git
     cd trinetra-cli
     ```
 
 2.  **Create a virtual environment (recommended):**
     ```bash
     python -m venv venv
-    .\venv\Scripts\activate  # On Windows
-    # source venv/bin/activate  # On Linux/macOS
+    # .\venv\Scripts\activate  # On Windows
+    source venv/bin/activate  # On Linux/macOS
     ```
 
 3.  **Install the package in editable mode:**
